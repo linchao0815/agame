@@ -32,7 +32,8 @@
 <script type="module">
 // Finds a portal host this network reaches (the company blocks duckdns) and moves the whole page there.
 // Whatever goes wrong (no config.js, the helper fails to load or throws), the page ends on the failure screen
-// with the addresses it knows, never on "searching..." forever (review 2026-10-21, codex / agy).
+// with the addresses it knows, never on "searching..." forever (review 2026-10-21, codex / agy). No top-level await:
+// a browser without it (Safari before 15) would reject the whole script before any catch runs (kiro-cli).
 const cfg = window.AGAME_LAUNCHER ?? {};
 // Only plain origins a URL parser accepts ("https://:443" passes a regex but not new URL, pre-push review, codex).
 const isOrigin = (h) => { try { const u = new URL(h); return /^https?:$/.test(u.protocol) && u.origin === h; } catch { return false; } };
@@ -56,7 +57,7 @@ function fail(text) {
   document.getElementById("fail").hidden = false;
 }
 
-try {
+(async () => {
   if (!hosts.length) {
     fail("這個入口的設定（config.js）缺少或是空的，請通知管理員。");
   } else {
@@ -71,9 +72,7 @@ try {
       fail("連不上伺服器。");
     }
   }
-} catch {
-  fail("入口頁面載入失敗。");
-}
+})().catch(() => fail("入口頁面載入失敗。"));
 </script>
 </body>
 </html>
