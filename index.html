@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>遊戲入口</title>
+<style>
+  :root { color-scheme: light dark; --bg: #f6f7f9; --fg: #1d2330; --dim: #5b6475; --card: #fff; --line: #d8dde6; --accent: #2b6de8; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #14171d; --fg: #e8ebf1; --dim: #9aa3b5; --card: #1d222b; --line: #2d3440; --accent: #6c9cff; } }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 system-ui, "Noto Sans TC", sans-serif; }
+  main { max-width: 32rem; margin: 0 auto; padding: 2.5rem 1rem; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 1rem 1.25rem; margin-top: 1rem; }
+  .dim { color: var(--dim); }
+  a { color: var(--accent); }
+  li { margin: .35rem 0; }
+  [hidden] { display: none !important; }
+</style>
+<!-- window.AGAME_LAUNCHER = { hosts: ["https://agame.duckdns.org", ...], timeoutMs }: written at deploy (decision 0016). -->
+<script src="./config.js"></script>
+</head>
+<body>
+<main>
+  <h1>遊戲入口</h1>
+  <p class="dim" id="status">正在找可以連上的伺服器…</p>
+  <div class="card" id="fail" hidden>
+    <p id="why"></p>
+    <p>目前連不上任何一個伺服器。可能是網路暫時不通，請稍後重新整理，或直接點下面的網址試試：</p>
+    <ul id="links"></ul>
+  </div>
+  <p class="dim">請把<b>這一頁</b>加入書籤：伺服器的網址換了，這裡也會自動帶你過去。</p>
+</main>
+<script type="module">
+// Finds a portal host this network reaches (the company blocks duckdns) and moves the whole page there.
+// Whatever goes wrong (no config.js, the helper fails to load or throws), the page ends on the failure screen
+// with the addresses it knows, never on "searching..." forever (review 2026-10-21, codex / agy).
+const cfg = window.AGAME_LAUNCHER ?? {};
+// Only plain origins a URL parser accepts ("https://:443" passes a regex but not new URL, pre-push review, codex).
+const isOrigin = (h) => { try { const u = new URL(h); return /^https?:$/.test(u.protocol) && u.origin === h; } catch { return false; } };
+const hosts = Array.isArray(cfg.hosts) ? cfg.hosts.filter((h) => typeof h === "string" && isOrigin(h)) : [];
+const timeoutMs = Number(cfg.timeoutMs) > 0 ? Number(cfg.timeoutMs) : 4000;
+const status = document.getElementById("status");
+let target = "/games/hub/";
+
+function fail(text) {
+  status.textContent = text;
+  document.getElementById("why").textContent = text;
+  const ul = document.getElementById("links");
+  for (const h of hosts) {
+    const li = document.createElement("li");
+    const a = document.createElement("a");
+    a.href = h + target;
+    a.textContent = new URL(h).host;
+    li.append(a);
+    ul.append(li);
+  }
+  document.getElementById("fail").hidden = false;
+}
+
+try {
+  if (!hosts.length) {
+    fail("這個入口的設定（config.js）缺少或是空的，請通知管理員。");
+  } else {
+    const { findPortal, probeHost, recall, remember, safeTarget } = await import("./launcher.js");
+    target = safeTarget(new URLSearchParams(location.search).get("to"));
+    const host = await findPortal(hosts, { probe: (h) => probeHost(h, fetch, timeoutMs), remembered: recall() });
+    if (host) {
+      remember(host);
+      status.textContent = "找到了，正在進入…";
+      location.replace(host + target);
+    } else {
+      fail("連不上伺服器。");
+    }
+  }
+} catch {
+  fail("入口頁面載入失敗。");
+}
+</script>
+</body>
+</html>
