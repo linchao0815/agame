@@ -40,6 +40,30 @@ export function safeTarget(to) {
   return to;
 }
 
+/** The game's copy on GitHub Pages (decision 0019) for a target under /games/<id>/, when every host is down:
+ *  `base` is the Pages folder holding one folder per game (config.js `maintenance`). null for the lobby (the hub
+ *  has no Pages copy) or a base that is not an http(s) folder URL. */
+export function maintenanceTarget(base, target) {
+  if (typeof base !== "string" || !/^https?:\/\/[^/?#]+\/([^?#]*\/)?$/.test(base)) return null;
+  const m = /^\/games\/([a-z0-9][a-z0-9-]*)\//.exec(safeTarget(target));
+  return m && m[1] !== "hub" ? `${base}${m[1]}/` : null;
+}
+
+/** True when the game's Pages copy is published (HEAD answers 2xx within timeoutMs): a game not published there
+ *  yet would otherwise land on GitHub's 404 page instead of the list of addresses. */
+export async function copyExists(url, fetchImpl, timeoutMs) {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), timeoutMs);
+  try {
+    const r = await fetchImpl(url, { method: "HEAD", signal: ctl.signal, cache: "no-store", credentials: "omit" });
+    return r.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** Remembered host from the browser; storage can be blocked, which only costs the "try this one first". */
 export function recall() {
   try { return localStorage.getItem(REMEMBER); } catch { return null; }

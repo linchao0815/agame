@@ -61,7 +61,7 @@ function fail(text) {
   if (!hosts.length) {
     fail("這個入口的設定（config.js）缺少或是空的，請通知管理員。");
   } else {
-    const { findPortal, probeHost, recall, remember, safeTarget } = await import("./launcher.js");
+    const { copyExists, findPortal, maintenanceTarget, probeHost, recall, remember, safeTarget } = await import("./launcher.js");
     target = safeTarget(new URLSearchParams(location.search).get("to"));
     const host = await findPortal(hosts, { probe: (h) => probeHost(h, fetch, timeoutMs), remembered: recall() });
     if (host) {
@@ -69,7 +69,11 @@ function fail(text) {
       status.textContent = "找到了，正在進入…";
       location.replace(host + target);
     } else {
-      fail("連不上伺服器。");
+      // A game whose copy is on GitHub Pages (decision 0019): show it with the maintenance notice; it comes back here
+      // by itself once a host answers. The lobby, or a game not published there yet: the list of addresses.
+      const copy = maintenanceTarget(cfg.maintenance, target);
+      if (copy && await copyExists(copy, fetch, timeoutMs)) { status.textContent = "伺服器維護中，正在開啟遊戲畫面…"; location.replace(copy); }
+      else fail("連不上伺服器。");
     }
   }
 })().catch(() => fail("入口頁面載入失敗。"));
